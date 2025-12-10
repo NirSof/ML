@@ -4,7 +4,7 @@ import seaborn as sns
 import numpy as np
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
-
+from sklearn.preprocessing import StandardScaler
 # SimpleImputer is not used directly for Random Sample here, but included for context
 # from sklearn.impute import SimpleImputer
 
@@ -16,7 +16,7 @@ file_path = "Car_Insurance_Claim 3.csv"
 df_original = pd.read_csv(file_path)
 
 # Drop irrelevant columns from the original DataFrame
-cols_to_drop = ["ID", "POSTAL_CODE"]
+cols_to_drop = ["ID", "POSTAL_CODE", "RACE"]
 df_original = df_original.drop(columns=cols_to_drop, errors='ignore')
 
 # Define columns that need imputation
@@ -169,3 +169,80 @@ print("\n--- FINAL DATAFRAME SELECTED ---")
 print("The 'df' DataFrame is now set to the Iterative (Multi-Feature) imputed data.")
 print(f"Missing values in {IMPUTATION_COLS} after final selection:")
 print(df[IMPUTATION_COLS].isnull().sum())
+
+# --- START: FEATURE ENGINEERING - Outlier Handling and Normalization ---
+
+# Define continuous/count columns for scaling (Normalization)
+# We include all non-normalized numeric variables for uniform scaling (Mean=0, Std=1).
+SCALING_COLS = ["ANNUAL_MILEAGE", "SPEEDING_VIOLATIONS", "DUIS", "PAST_ACCIDENTS"]
+
+
+# ####################################################################
+# PHASE 1: OUTLIER HANDLING (Capping/Clipping) on ANNUAL_MILEAGE
+# The IQR method (Q3 + 1.5*IQR) is used for robust outlier detection.
+# ####################################################################
+
+mileage_series = df["ANNUAL_MILEAGE"]
+
+# 1. Calculate IQR and bounds
+Q1 = mileage_series.quantile(0.25)
+Q3 = mileage_series.quantile(0.75)
+IQR = Q3 - Q1
+lower_bound = Q1 - 1.5 * IQR
+upper_bound = Q3 + 1.5 * IQR
+
+# 2. Print statistical report and create Boxplot (Pre-Clipping Visualization)
+print("\n--- ANNUAL_MILEAGE Outlier Analysis (Boxplot Method) ---")
+print(f"Q1 (25th Percentile): {Q1:.2f}")
+print(f"Q3 (75th Percentile): {Q3:.2f}")
+print(f"Upper Bound for Outliers: {upper_bound:.2f}")
+
+plt.figure(figsize=(8, 6))
+sns.boxplot(y=mileage_series, color='skyblue')
+plt.title('Boxplot of ANNUAL_MILEAGE (Pre-Clipping)', fontsize=14)
+plt.ylabel('Annual Mileage')
+plt.show()
+
+# 3. Clipping Action: Replace values outside the bounds with the bounds themselves (Trimming)
+outlier_count = mileage_series[(mileage_series < lower_bound) | (mileage_series > upper_bound)].count()
+
+if outlier_count > 0:
+    # Applying the clipping directly to the main DataFrame 'df'
+    df["ANNUAL_MILEAGE"] = np.clip(df["ANNUAL_MILEAGE"], lower_bound, upper_bound)
+    print(f"\nACTION: {outlier_count} outliers in ANNUAL_MILEAGE were clipped to the bounds ({lower_bound:.2f} to {upper_bound:.2f}).")
+else:
+    print("\nACTION: No significant outliers found, no clipping performed.")
+
+# Visualization after clipping (to confirm action)
+plt.figure(figsize=(8, 6))
+sns.boxplot(y=df["ANNUAL_MILEAGE"], color='lightgreen')
+plt.title('Boxplot of ANNUAL_MILEAGE (After Clipping)', fontsize=14)
+plt.ylabel('Annual Mileage')
+plt.show()
+
+
+# ####################################################################
+# PHASE 2: NORMALIZATION (Z-Score Standardization)
+# Applied to all scaling columns to ensure Mean=0 and Std_Dev=1.
+# This equalizes feature contribution across all numeric features.
+# ####################################################################
+
+print("\n--- Applying Z-Score Normalization (Standardization) on all scaling columns ---")
+
+scaler = StandardScaler()
+
+# Check and scale the selected columns
+for col in SCALING_COLS:
+    if col in df.columns:
+        # Scale only if the standard deviation is not zero
+        if df[col].std() > 1e-6:
+            df[col] = scaler.fit_transform(df[[col]])
+            print(f"Standardized column: {col}")
+        else:
+            print(f"Skipping {col}: Standard deviation is near zero (constant values).")
+
+# Verification: Check the mean (should be ~0) and standard deviation (should be ~1)
+print("\n--- Verification of Standardization ---")
+print(df[SCALING_COLS].describe().loc[['mean', 'std']].round(4))
+
+# --- END: FEATURE ENGINEERING ---
