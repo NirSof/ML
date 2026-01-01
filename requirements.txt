@@ -1,7 +1,21 @@
-pandas==2.3.3
-numpy==2.3.5
-matplotlib==3.10.7
+# Data Manipulation
+pandas==2.2.3
+numpy==2.0.0
+
+# Visualization
+matplotlib==3.10.0
 seaborn==0.13.2
-jupyter==1.1.1
-scipy==1.16.3
+
+# Machine Learning & Preprocessing
 scikit-learn==1.6.1
+scipy==1.14.1
+xgboost==2.1.3
+
+# Statistics (For VIF calculation)
+statsmodels==0.14.4
+
+# Export (For saving to Excel)
+openpyxl==3.1.5
+
+# Environment
+jupyter==1.1.1
